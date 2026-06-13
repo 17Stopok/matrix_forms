@@ -52,41 +52,60 @@ def print_matrix(M, label=""):
 
 def jordan_form(M):
     try:
-        import sympy
-        A = sympy.Matrix(M)
+        import numpy as np
+        A = np.array(M, dtype=float)
+        n = A.shape[0]
         
+        if A.shape[0] != A.shape[1]:
+            print("\n  Chyba: Jordanova forma vyžaduje štvorcovú maticu.")
+            return
+
         print("\n  Počítam... (môže chvíľu trvať)")
         
-        eigvals = A.eigenvals()
+        raw_eigvals = np.linalg.eigvals(A)
         
-        def sympy_to_num(expr):
-            try:
-                val = complex(expr.evalf())
-                if abs(val.imag) < 1e-10:
-                    r = val.real
-                    if abs(r - round(r)) < 1e-10:
-                        return int(round(r))
-                    return round(r, 4)
-                return f"{round(val.real,3)}+{round(val.imag,3)}j"
-            except:
-                return str(expr)
+        def format_num(x):
+            if not np.isreal(x) and abs(np.imag(x)) >= 1e-5:
+                r = np.round(np.real(x), 3)
+                i = np.round(np.imag(x), 3)
+                return f"{r}+{i}j" if i >= 0 else f"{r}{i}j"
+            val = np.real(x)
+            return int(np.round(val)) if abs(val - np.round(val)) < 1e-5 else np.round(val, 4)
 
         print("\n  Vlastné čísla:")
-        for val, mult in eigvals.items():
-            print(f"    λ = {sympy_to_num(val)},  algebraická kratnosť = {mult}")
+        unique_eigs, counts = np.unique(np.round(raw_eigvals, 5), return_counts=True)
+        for e, mult in zip(unique_eigs, counts):
+            print(f"    λ = {format_num(e)},  algebraická kratnosť = {mult}")
 
-        P, J = A.jordan_form()
+        eigenvalues, eigenvectors = np.linalg.eig(A)
+        
+        J = np.zeros((n, n), dtype=complex)
+        P = np.zeros((n, n), dtype=complex)
+        
+        for i in range(n):
+            J[i, i] = eigenvalues[i]
+            P[:, i] = eigenvectors[:, i]
 
-        J_num = [[sympy_to_num(J[i,j]) for j in range(J.shape[1])]
-                 for i in range(J.shape[0])]
-        P_num = [[sympy_to_num(P[i,j]) for j in range(P.shape[1])]
-                 for i in range(P.shape[0])]
+        for i in range(n - 1):
+            if np.isclose(J[i, i], J[i+1, i+1], atol=1e-5):
+                dot_prod = np.abs(np.dot(P[:, i], P[:, i+1]))
+                if dot_prod > 0.99:  
+                    J[i, i+1] = 1.0
+                    M_lam = A - J[i, i] * np.eye(n)
+                    try:
+                        v_gen = np.linalg.lstsq(M_lam, P[:, i], rcond=None)[0]
+                        P[:, i+1] = v_gen
+                    except:
+                        pass
 
-        print_matrix(J_num, label="\n  Jordanova normálna forma J:")
-        print_matrix(P_num, label="\n  Matica prechodu P (také že A = P⁻¹JP):")
+        J_num = [[format_num(J[i,j]) for j in range(n)] for i in range(n)]
+        P_num = [[format_num(P[i,j]) for j in range(n)] for i in range(n)]
+
+        print_matrix(J_num, label="Jordanova normálna forma J:")
+        print_matrix(P_num, label="Matica prechodu P (také že A ≈ P * J * P⁻¹):")
 
     except ImportError:
-        print("\n  Chyba: vyžaduje sa knižnica sympy (pip install sympy)")
+        print("\n  Chyba: vyžaduje sa knižnica numpy (pip install numpy)")
     except Exception as e:
         print(f"\n  Chyba pri výpočte: {e}")
         
