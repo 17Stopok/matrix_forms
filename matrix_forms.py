@@ -1,6 +1,5 @@
 import math
 import numpy as np
-from fractions import Fraction
 
 # ─────────────────────────────────────────────
 # POMOCNÉ FUNKCIE
@@ -52,7 +51,6 @@ def print_matrix(M, label=""):
 
 def jordan_form(M):
     try:
-        import numpy as np
         A = np.array(M, dtype=float)
         n = A.shape[0]
         
@@ -118,53 +116,63 @@ def smith_normal_form(M):
     cols = len(M[0])
     A = [row[:] for row in M]
 
-    def row_op(i1, i2, factor, add=True):
-        for j in range(cols):
-            if add:
-                A[i1][j] += factor * A[i2][j]
-            else:
-                A[i1][j] = factor * A[i2][j]
+    def idiv(a, b):
+        q = a // b 
+        if a % b != 0 and (a < 0) != (b < 0):
+            q += 1
+        return q
 
-    def col_op(j1, j2, factor):
-        for i in range(rows):
-            A[i][j1] += factor * A[i][j2]
-
-    pivot = 0
     for step in range(min(rows, cols)):
-        found = False
-        for i in range(step, rows):
-            for j in range(step, cols):
-                if A[i][j] != 0:
-                    A[step], A[i] = A[i], A[step]
-                    for k in range(rows):
-                        A[k][step], A[k][j] = A[k][j], A[k][step]
-                    found = True
-                    break
-            if found:
-                break
-        if not found:
-            break
+        while True:
+            pivot_r, pivot_c = -1, -1
+            min_val = float('inf')
+            
+            for i in range(step, rows):
+                for j in range(step, cols):
+                    if A[i][j] != 0 and abs(A[i][j]) < min_val:
+                        min_val = abs(A[i][j])
+                        pivot_r, pivot_c = i, j
+            
+            if pivot_r == -1:
+                break  
 
-        changed = True
-        while changed:
+            if pivot_r != step:
+                A[step], A[pivot_r] = A[pivot_r], A[step]
+            if pivot_c != step:
+                for k in range(rows):
+                    A[k][step], A[k][pivot_c] = A[k][pivot_c], A[k][step]
+
             changed = False
+            
             for i in range(step + 1, rows):
                 if A[i][step] != 0:
-                    q = A[i][step] // A[step][step]
-                    for j in range(cols):
+                    q = idiv(A[i][step], A[step][step])
+                    for j in range(step, cols):
                         A[i][j] -= q * A[step][j]
-                    if A[i][step] != 0:
-                        A[step], A[i] = A[i], A[step]
                     changed = True
+            
             for j in range(step + 1, cols):
                 if A[step][j] != 0:
-                    q = A[step][j] // A[step][step]
-                    for i in range(rows):
+                    q = idiv(A[step][j], A[step][step])
+                    for i in range(step, rows):
                         A[i][j] -= q * A[i][step]
-                    if A[step][j] != 0:
-                        for k in range(rows):
-                            A[k][step], A[k][j] = A[k][j], A[k][step]
                     changed = True
+
+            if changed:
+                continue
+            condition_failed = False
+            for i in range(step + 1, rows):
+                for j in range(step + 1, cols):
+                    if A[i][j] % A[step][step] != 0:
+                        for k in range(step, cols):
+                            A[step][k] += A[i][k]
+                        condition_failed = True
+                        break
+                if condition_failed:
+                    break
+            
+            if not condition_failed:
+                break
 
         if A[step][step] < 0:
             for j in range(cols):
